@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#123b5d"><meta name="description" content="Aplikasi anggaran pembelian barang yang bisa digunakan offline.">
+<link rel="manifest" href="manifest.json">
+<title>Anggaran Barang</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#182638;background:#f2f5f8}*{box-sizing:border-box}body{margin:0}header{background:#123b5d;color:white;padding:20px 16px}header h1{font-size:22px;margin:0 0 5px}header p{margin:0;opacity:.85;font-size:13px}.wrap{max-width:1000px;margin:auto;padding:14px}.panel{background:white;border:1px solid #e0e6ed;border-radius:15px;padding:15px;margin-bottom:13px;box-shadow:0 3px 12px #12283a0a}.label{display:block;font-size:13px;color:#526477;margin-bottom:5px}input{font:inherit;width:100%;min-width:0;padding:10px;border:1px solid #ccd6e0;border-radius:9px;background:white;color:#182638}button{font:inherit;font-weight:650;border:0;border-radius:10px;padding:10px 13px;background:#1769aa;color:white;cursor:pointer}button.secondary{background:#e9f1f8;color:#17466b}button.danger{background:#fff0ef;color:#a62c26}.summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.stat{background:#f4f8fb;border-radius:11px;padding:11px}.stat small{display:block;color:#5b6e7f;font-size:12px}.stat strong{display:block;font-size:clamp(14px,3.4vw,21px);margin-top:5px;overflow-wrap:anywhere}.tablewrap{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:650px}th,td{padding:8px;border-bottom:1px solid #e6ebf0;text-align:left;font-size:13px}th{color:#536579;background:#f7f9fb}td input{padding:8px}.actions{display:flex;flex-wrap:wrap;gap:8px}.itemname{min-width:150px}.num{min-width:105px}.qty{min-width:75px}.hint{font-size:12px;color:#617184;line-height:1.5}.status{font-size:12px;margin-top:9px;color:#dcebf7}.install{display:none}.foot{text-align:center;color:#708092;font-size:12px;padding:8px}@media(max-width:520px){.summary{grid-template-columns:1fr}.stat{display:flex;align-items:center;justify-content:space-between;gap:10px}.stat strong{margin:0;text-align:right}.wrap{padding:10px}header{padding:17px 13px}}
+@media print{header,.no-print,button,.hint,.foot{display:none!important}body{background:white}.wrap{max-width:none;padding:0}.panel{box-shadow:none;border:0;padding:5px}.tablewrap{overflow:visible}table{min-width:0}th,td{font-size:10px;padding:5px}td input{border:0;padding:0}.summary{grid-template-columns:repeat(3,1fr)}}
+</style></head>
+<body>
+<header><h1>📦 Anggaran Pembelian Barang</h1><p>Catat barang, pantau pembelian, dan lihat sisa anggaran.</p><div id="offlineStatus" class="status">Mode aplikasi: memeriksa koneksi…</div></header>
+<main class="wrap">
+<section class="panel">
+<label class="label" for="budget">Saldo awal / anggaran (Rp)</label><input id="budget" type="number" min="0" step="1000" value="10000000">
+<div class="summary" style="margin-top:12px">
+<div class="stat"><small>Total pembelian</small><strong id="total">Rp0</strong></div>
+<div class="stat"><small>Saldo tersedia</small><strong id="balance">Rp10.000.000</strong></div>
+<div class="stat"><small>Selisih anggaran</small><strong id="difference">Rp10.000.000</strong></div>
+</div>
+<p class="hint">Selisih = anggaran awal dikurangi total pembelian. Jika hasil minus, berarti pembelian melebihi anggaran.</p>
+</section>
+<section class="panel">
+<div class="actions no-print" style="justify-content:space-between;align-items:center;margin-bottom:12px"><strong>Daftar barang</strong><button id="add">＋ Tambah barang</button></div>
+<div class="tablewrap"><table><thead><tr><th>No.</th><th>Nama barang</th><th>Harga satuan (Rp)</th><th>Jumlah</th><th>Total (Rp)</th><th class="no-print">Aksi</th></tr></thead><tbody id="rows"></tbody></table></div>
+<p id="empty" class="hint" hidden>Belum ada barang. Tekan “Tambah barang” untuk mulai.</p>
+</section>
+<section class="panel no-print">
+<strong>Data & laporan</strong><p class="hint">Data tersimpan otomatis di perangkat/browser ini. Untuk menghindari kehilangan data, gunakan ekspor cadangan secara berkala.</p>
+<div class="actions"><button id="save" class="secondary">Simpan sekarang</button><button id="export">Ekspor CSV (Excel)</button><button id="backup" class="secondary">Cadangkan JSON</button><button id="import" class="secondary">Impor JSON</button><button id="print">Cetak laporan</button><button id="clear" class="danger">Hapus semua barang</button><input id="file" type="file" accept=".json,application/json" hidden></div><p id="message" class="hint" aria-live="polite"></p>
+</section><div class="foot">Anggaran Barang • PWA siap dipasang setelah di-host melalui HTTPS.</div></main>
+<script>
+const $=id=>document.getElementById(id);let items=[];let nextId=1;
+const fmt=n=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(n)||0);
+function persist(){try{localStorage.setItem('anggaranBarangV1',JSON.stringify({budget:$('budget').value,items,nextId}));$('message').textContent='Data tersimpan di perangkat ini.'}catch(e){$('message').textContent='Penyimpanan browser tidak tersedia. Ekspor cadangan agar data aman.'}}
+function load(){try{let d=JSON.parse(localStorage.getItem('anggaranBarangV1')||'null');if(d){if(d.budget!==undefined)$('budget').value=d.budget;items=Array.isArray(d.items)?d.items:[];nextId=Number(d.nextId)||1}}catch(e){}render()}
+function render(){let tbody=$('rows');tbody.replaceChildren();items.forEach((it,index)=>{let tr=document.createElement('tr');const cell=(content,cls)=>{let td=document.createElement('td');if(cls)td.className=cls;td.append(content);tr.append(td);return td};cell(document.createTextNode(index+1));let name=document.createElement('input');name.className='itemname';name.value=it.name||'';name.placeholder='Nama barang';name.setAttribute('aria-label','Nama barang');name.addEventListener('input',()=>{it.name=name.value;persist()});cell(name);let price=document.createElement('input');price.type='number';price.min='0';price.step='1';price.className='num';price.value=it.price??0;price.setAttribute('aria-label','Harga satuan');price.addEventListener('input',()=>{it.price=price.value;updateTotals();persist();sum.textContent=fmt((Number(it.price)||0)*(Number(it.qty)||0))});cell(price);let qty=document.createElement('input');qty.type='number';qty.min='0';qty.step='1';qty.className='qty';qty.value=it.qty??1;qty.setAttribute('aria-label','Jumlah barang');qty.addEventListener('input',()=>{it.qty=qty.value;updateTotals();persist();sum.textContent=fmt((Number(it.price)||0)*(Number(it.qty)||0))});cell(qty);let sum=document.createElement('span');sum.textContent=fmt((Number(it.price)||0)*(Number(it.qty)||0));cell(sum);let del=document.createElement('button');del.className='danger no-print';del.textContent='Hapus';del.addEventListener('click',()=>{items=items.filter(x=>x.id!==it.id);render();persist()});cell(del,'no-print');tbody.append(tr)});$('empty').hidden=items.length!==0;updateTotals()}
+function updateTotals(){let total=items.reduce((s,i)=>s+Math.max(0,Number(i.price)||0)*Math.max(0,Number(i.qty)||0),0);let budget=Number($('budget').value)||0;let bal=budget-total;$('total').textContent=fmt(total);$('balance').textContent=fmt(bal);$('difference').textContent=fmt(bal);$('balance').style.color=bal<0?'#b42318':'#137547';$('difference').style.color=bal<0?'#b42318':'#182638'}
+$('add').onclick=()=>{items.push({id:nextId++,name:'',price:0,qty:1});render();persist();let inputs=$('rows').querySelectorAll('input.itemname');if(inputs.length)inputs[inputs.length-1].focus()};
+$('budget').addEventListener('input',()=>{updateTotals();persist()});$('save').onclick=persist;$('print').onclick=()=>window.print();
+$('clear').onclick=()=>{if(confirm('Hapus semua barang dari daftar? Anggaran awal tetap disimpan.')){items=[];render();persist()}};
+function csvEscape(v){return '"'+String(v??'').replace(/"/g,'""')+'"'}
+$('export').onclick=()=>{let data=[['No','Nama barang','Harga satuan','Jumlah','Total'],...items.map((x,i)=>[i+1,x.name,x.price,x.qty,(Number(x.price)||0)*(Number(x.qty)||0)]),[],['Anggaran awal',$('budget').value],['Total pembelian',items.reduce((s,x)=>s+(Number(x.price)||0)*(Number(x.qty)||0),0)],['Saldo / selisih',(Number($('budget').value)||0)-items.reduce((s,x)=>s+(Number(x.price)||0)*(Number(x.qty)||0),0)]];let csv='\ufeff'+data.map(r=>r.map(csvEscape).join(';')).join('\r\n');download(new Blob([csv],{type:'text/csv;charset=utf-8'}),'laporan-anggaran-barang.csv')};
+$('backup').onclick=()=>download(new Blob([JSON.stringify({budget:$('budget').value,items,nextId},null,2)],{type:'application/json'}),'cadangan-anggaran-barang.json');
+function download(blob,name){let url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+$('import').onclick=()=>$('file').click();$('file').onchange=async e=>{let f=e.target.files[0];if(!f)return;try{let d=JSON.parse(await f.text());if(!Array.isArray(d.items))throw Error('Format tidak sesuai');items=d.items.map((x,i)=>({id:Number(x.id)||i+1,name:String(x.name||''),price:Number(x.price)||0,qty:Number(x.qty)||0}));nextId=Math.max(1,Number(d.nextId)||items.length+1);if(d.budget!==undefined)$('budget').value=d.budget;render();persist();$('message').textContent='Cadangan berhasil diimpor.'}catch(err){$('message').textContent='File tidak valid atau formatnya tidak sesuai.'}e.target.value=''};
+window.addEventListener('online',status);window.addEventListener('offline',status);function status(){$('offlineStatus').textContent=navigator.onLine?'Koneksi tersedia • data tetap tersimpan lokal':'Offline • aplikasi dan data lokal tetap dapat digunakan';}
+if('serviceWorker' in navigator && location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});load();status();
+</script></body></html>
